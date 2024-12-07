@@ -1,0 +1,286 @@
+import pandas as pd
+import numpy as np
+from xgboost import XGBRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from itertools import combinations
+
+data = [
+    [1, 5, 6, 11, 12, 13, 16, 18, 19, 24, 35, 36, 39, 45, 46, 60, 63, 72, 75, 78],
+    [4, 13, 19, 21, 25, 31, 32, 38, 46, 47, 50, 51, 52, 54, 56, 66, 67, 75, 76, 79],
+    [2, 4, 14, 16, 34, 35, 37, 40, 45, 52, 54, 61, 62, 65, 67, 68, 69, 70, 73, 75],
+    [8, 18, 19, 20, 25, 34, 40, 43, 45, 47, 55, 59, 60, 61, 67, 69, 70, 77, 78, 80],
+]
+
+flat_data = [num for row in data for num in row]
+unique_numbers, counts = np.unique(flat_data, return_counts=True)
+
+for number, count in zip(unique_numbers, counts):
+    print(f"Ο αριθμός {number} εμφανίζεται {count} φορές")
+
+def group_into_twenties(data):
+    grouped_data = {
+        "1-20": [],
+        "21-40": [],
+        "41-60": [],
+        "61-80": []
+    }
+    for numbers in data:
+        for num in numbers:
+            if 1 <= num <= 20:
+                grouped_data["1-20"].append(num)
+            elif 21 <= num <= 40:
+                grouped_data["21-40"].append(num)
+            elif 41 <= num <= 60:
+                grouped_data["41-60"].append(num)
+            elif 61 <= num <= 80:
+                grouped_data["61-80"].append(num)
+    return grouped_data
+
+def create_lagged_features(data, n_lags):
+    X, y = [], []
+    for i in range(n_lags, len(data)):
+        X.append(data[i - n_lags:i])
+        y.append(data[i])
+    return np.array(X), np.array(y)
+
+def evaluate_model(y_true, y_pred):
+    mse = mean_squared_error(y_true, y_pred)
+    mae = mean_absolute_error(y_true, y_pred)
+    print(f"Mean Squared Error (MSE): {mse:.2f}")
+    print(f"Mean Absolute Error (MAE): {mae:.2f}")
+    return mse, mae
+
+grouped_data = group_into_twenties(data)
+df = pd.DataFrame({key: pd.Series(value) for key, value in grouped_data.items()})
+
+data_1 = df["1-20"].dropna().astype(int).tolist()
+data_2 = df["21-40"].dropna().astype(int).tolist()
+data_3 = df["41-60"].dropna().astype(int).tolist()
+data_4 = df["61-80"].dropna().astype(int).tolist()
+
+dataset_1 = np.array(df["1-20"].dropna().astype(int).tolist())
+dataset_2 = np.array(df["21-40"].dropna().astype(int).tolist())
+dataset_3 = np.array(df["41-60"].dropna().astype(int).tolist())
+dataset_4 = np.array(df["61-80"].dropna().astype(int).tolist())
+
+count_1 = len(data_1)
+count_2 = len(data_2)
+count_3 = len(data_3)
+count_4 = len(data_4)
+
+def format_np_array(array):
+    return "np.array([" + ", ".join(map(str, array)) + "])"
+
+print()
+print("dataset_1 =", format_np_array(dataset_1))
+print()
+print("dataset_2 =", format_np_array(dataset_2))
+print()
+print("dataset_3 =", format_np_array(dataset_3))
+print()
+print("dataset_4 =", format_np_array(dataset_4))
+print()
+
+print("Count of dataset_1:", dataset_1.size)
+print("Count of dataset_2:", dataset_2.size)
+print("Count of dataset_3:", dataset_3.size)
+print("Count of dataset_4:", dataset_4.size)
+print()
+
+def create_lagged_features(data, n_lags):
+    X, y = [], []
+    for i in range(n_lags, len(data)):
+        X.append(data[i-n_lags:i])
+        y.append(data[i])
+    return np.array(X), np.array(y)
+
+n_lags = 5
+
+# dataset_1
+X, y = create_lagged_features(dataset_1, n_lags)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=1, shuffle=False)
+
+xgb_model = XGBRegressor(n_estimators=500, max_depth=5, learning_rate=0.3, random_state=1)
+xgb_model.fit(X_train, y_train)
+
+input_sequence = dataset_1[-n_lags:].reshape(1, -1)
+xgb_predictions = []
+
+y_test_pred = xgb_model.predict(X_test)
+
+for _ in range(5):
+    pred = xgb_model.predict(input_sequence)[0]
+    xgb_predictions.append(pred)
+    input_sequence = np.append(input_sequence[:, 1:], [[pred]], axis=1)
+
+xgb_predictions_rounded = np.round(xgb_predictions).astype(int)
+xgb_predictions_rounded
+xgb_predictions_rounded_dataset_1 = xgb_predictions_rounded
+print('Οι προβλέψεις για το dataset_1 είναι: [', ', '.join(map(str, xgb_predictions_rounded)), ']')
+evaluate_model(y_test, y_test_pred)
+
+# dataset_2
+X, y = create_lagged_features(dataset_2, n_lags)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1, shuffle=False)
+
+xgb_model = XGBRegressor(n_estimators=500, max_depth=5, learning_rate=0.3, random_state=1)
+xgb_model.fit(X_train, y_train)
+
+input_sequence = dataset_2[-n_lags:].reshape(1, -1)
+xgb_predictions = []
+
+y_test_pred = xgb_model.predict(X_test)
+
+for _ in range(5):
+    pred = xgb_model.predict(input_sequence)[0]
+    xgb_predictions.append(pred)
+    input_sequence = np.append(input_sequence[:, 1:], [[pred]], axis=1)
+
+xgb_predictions_rounded = np.round(xgb_predictions).astype(int)
+xgb_predictions_rounded
+xgb_predictions_rounded_dataset_2 = xgb_predictions_rounded
+print('Οι προβλέψεις για το dataset_2 είναι: [', ', '.join(map(str, xgb_predictions_rounded)), ']')
+evaluate_model(y_test, y_test_pred)
+
+# dataset_3
+X, y = create_lagged_features(dataset_3, n_lags)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1, shuffle=False)
+
+xgb_model = XGBRegressor(n_estimators=500, max_depth=5, learning_rate=0.3, random_state=1)
+xgb_model.fit(X_train, y_train)
+
+input_sequence = dataset_3[-n_lags:].reshape(1, -1)
+xgb_predictions = []
+
+y_test_pred = xgb_model.predict(X_test)
+
+for _ in range(5):
+    pred = xgb_model.predict(input_sequence)[0]
+    xgb_predictions.append(pred)
+    input_sequence = np.append(input_sequence[:, 1:], [[pred]], axis=1)
+
+xgb_predictions_rounded = np.round(xgb_predictions).astype(int)
+xgb_predictions_rounded
+xgb_predictions_rounded_dataset_3 = xgb_predictions_rounded
+print('Οι προβλέψεις για το dataset_3 είναι: [', ', '.join(map(str, xgb_predictions_rounded)), ']')
+evaluate_model(y_test, y_test_pred)
+
+# dataset_4
+X, y = create_lagged_features(dataset_4, n_lags)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1, shuffle=False)
+
+xgb_model = XGBRegressor(n_estimators=500, max_depth=5, learning_rate=0.3, random_state=1)
+xgb_model.fit(X_train, y_train)
+
+input_sequence = dataset_4[-n_lags:].reshape(1, -1)
+xgb_predictions = []
+
+y_test_pred = xgb_model.predict(X_test)
+
+for _ in range(5):
+    pred = xgb_model.predict(input_sequence)[0]
+    xgb_predictions.append(pred)
+    input_sequence = np.append(input_sequence[:, 1:], [[pred]], axis=1)
+
+xgb_predictions_rounded = np.round(xgb_predictions).astype(int)
+xgb_predictions_rounded
+xgb_predictions_rounded_dataset_4 = xgb_predictions_rounded
+print('Οι προβλέψεις για το dataset_4 είναι: [', ', '.join(map(str, xgb_predictions_rounded)), ']')
+evaluate_model(y_test, y_test_pred)
+print()
+
+all_predictions = np.concatenate([
+    xgb_predictions_rounded_dataset_1,
+    xgb_predictions_rounded_dataset_2,
+    xgb_predictions_rounded_dataset_3,
+    xgb_predictions_rounded_dataset_4
+])
+
+dataset_5 = np.sort(all_predictions)
+print("dataset_5 =", format_np_array(dataset_5))
+print()
+
+freq = {num: np.count_nonzero(dataset_1 == num) for num in xgb_predictions_rounded_dataset_1}
+triplets = list(combinations(xgb_predictions_rounded_dataset_1, 3))
+triplet_values = []
+for t in triplets:
+    triplet_sum = freq[t[0]] + freq[t[1]] + freq[t[2]]
+    triplet_values.append((t, triplet_sum))
+
+triplet_values.sort(key=lambda x: x[1], reverse=True)
+best_triplet = triplet_values[0]
+dataset_11 = best_triplet[0]
+print("dataset_11 =", format_np_array(best_triplet[0]))
+
+freq = {num: np.count_nonzero(dataset_2 == num) for num in xgb_predictions_rounded_dataset_2}
+triplets = list(combinations(xgb_predictions_rounded_dataset_2, 3))
+triplet_values = []
+for t in triplets:
+    triplet_sum = freq[t[0]] + freq[t[1]] + freq[t[2]]
+    triplet_values.append((t, triplet_sum))
+
+triplet_values.sort(key=lambda x: x[1], reverse=True)
+best_triplet = triplet_values[0]
+dataset_22 = best_triplet[0]
+print("dataset_22 =", format_np_array(best_triplet[0]))
+
+freq = {num: np.count_nonzero(dataset_3 == num) for num in xgb_predictions_rounded_dataset_3}
+triplets = list(combinations(xgb_predictions_rounded_dataset_3, 3))
+triplet_values = []
+for t in triplets:
+    triplet_sum = freq[t[0]] + freq[t[1]] + freq[t[2]]
+    triplet_values.append((t, triplet_sum))
+
+triplet_values.sort(key=lambda x: x[1], reverse=True)
+best_triplet = triplet_values[0]
+dataset_33 = best_triplet[0]
+print("dataset_33 =", format_np_array(best_triplet[0]))
+
+freq = {num: np.count_nonzero(dataset_4 == num) for num in xgb_predictions_rounded_dataset_4}
+triplets = list(combinations(xgb_predictions_rounded_dataset_4, 3))
+triplet_values = []
+for t in triplets:
+    triplet_sum = freq[t[0]] + freq[t[1]] + freq[t[2]]
+    triplet_values.append((t, triplet_sum))
+
+triplet_values.sort(key=lambda x: x[1], reverse=True)
+best_triplet = triplet_values[0]
+dataset_44 = best_triplet[0]
+print("dataset_44 =", format_np_array(best_triplet[0]))
+print()
+
+all_triplets = np.concatenate([dataset_11, dataset_22, dataset_33, dataset_44])
+dataset_6 = np.sort(all_triplets)
+print("dataset_6 =", format_np_array(dataset_6))
+print()
+
+def select_least_frequent(triplet, original_dataset):
+    freq = {num: np.count_nonzero(original_dataset == num) for num in triplet}
+    least_frequent_num = min(freq, key=freq.get)
+    return np.array([least_frequent_num])
+
+dataset_111 = select_least_frequent(dataset_11, dataset_1)
+print("dataset_111 =", dataset_111)
+dataset_222 = select_least_frequent(dataset_22, dataset_2)
+print("dataset_222 =", dataset_222)
+dataset_333 = select_least_frequent(dataset_33, dataset_3)
+print("dataset_333 =", dataset_333)
+dataset_444 = select_least_frequent(dataset_44, dataset_4)
+print("dataset_444 =", dataset_444)
+print()
+
+four_numbers = np.concatenate([dataset_111, dataset_222, dataset_333, dataset_444])
+dataset_7 = np.sort(four_numbers)
+print("dataset_7 =", format_np_array(dataset_7))
+print()
+
+freq = {num: np.count_nonzero(np.array(flat_data) == num) for num in dataset_7}
+most_frequent_num = max(freq, key=freq.get)
+print("dataset_8:", most_frequent_num)
+print()
+
+print("dataset_5 =", format_np_array(dataset_5))
+print("dataset_6 =", format_np_array(dataset_6))
+print("dataset_7 =", format_np_array(dataset_7))
+print("dataset_8 =", format_np_array(np.array([most_frequent_num])))
